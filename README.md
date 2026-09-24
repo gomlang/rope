@@ -79,7 +79,7 @@ This is not a drop-in Ropey port: there are no grapheme iterators, reverse itera
 From the repository root:
 
 ```sh
-just ecosystem-test rope
+(cd ../verification && just ecosystem-test rope)
 ```
 
 The verifier checks formatting, 11 library black-box tests, separate versioned consumer tests, initial and cached consumer builds, the runnable consumer, native reference corpus checks, and Go's race detector over all library tests.
