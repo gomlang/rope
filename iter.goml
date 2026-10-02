@@ -139,3 +139,90 @@ impl Rope {
         Result::Ok(Lines { rope: self, next_line: Ref::new(index), include_ending: true })
     }
 }
+
+pub struct ReverseScalars {
+    pending: Vec[Ref[Node]],
+    current: Ref[string],
+    offset: Ref[isize],
+}
+
+impl Iterator for ReverseScalars {
+    type Item = char;
+
+    fn next(self: ReverseScalars) -> Option[char] {
+        while self.offset.get() == 0 {
+            let node = match self.pending.pop() {
+                Some(value) => value,
+                None => return Option::None,
+            };
+            match node.get() {
+                Empty => (),
+                Leaf(value, _) => {
+                    self.current.set(value);
+                    self.offset.set(value.byte_len());
+                },
+                Branch(left, right, _, _) => {
+                    self.pending.push(left);
+                    self.pending.push(right);
+                },
+            }
+        }
+        let text = self.current.get();
+        let mut offset = self.offset.get() - 1;
+        while offset > 0 && !text.is_char_boundary(offset) {
+            offset -= 1;
+        }
+        self.offset.set(offset);
+        Option::Some(text.get(offset))
+    }
+}
+
+impl Rope {
+    pub fn scalars_rev(self: Rope) -> ReverseScalars {
+        ReverseScalars {
+            pending: Vec::from_array([self.root]),
+            current: Ref::new(""),
+            offset: Ref::new(0),
+        }
+    }
+
+    pub fn scalars_before(self: Rope, index: isize) -> Result[ReverseScalars, Error] {
+        bounded(index, self.len_scalars(), "scalar")?;
+        let pending: Vec[Ref[Node]] = Vec::new();
+        let mut current = self.root;
+        let mut remaining = index;
+        loop {
+            match current.get() {
+                Empty => return Result::Ok(
+                    ReverseScalars { pending, current: Ref::new(""), offset: Ref::new(0) },
+                ),
+                Leaf(value, _) => {
+                    let mut offset = 0;
+                    while remaining > 0 {
+                        if let Some((_, width)) = value.decode_at(offset) {
+                            offset += width;
+                        }
+                        remaining -= 1;
+                    }
+                    return Result::Ok(
+                        ReverseScalars {
+                            pending,
+                            current: Ref::new(value),
+                            offset: Ref::new(offset),
+                        },
+                    )
+                },
+                Branch(left, right, _, _) => {
+                    let count = summary(left).scalars;
+                    if remaining <= count {
+                        current = left;
+                    } else {
+                        pending.push(left);
+                        remaining -= count;
+                        current = right;
+                    }
+                },
+            }
+        }
+    }
+}

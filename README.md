@@ -38,10 +38,18 @@ fn edit() -> Result[rope::Rope, rope::Error] {
 | Index conversion | `byte_to_scalar`, `scalar_to_byte`, `byte_to_utf16`, `utf16_to_byte`, `scalar_to_utf16`, `utf16_to_scalar`, `byte_to_line`, `line_to_byte`, `line_to_scalar`, `line_to_utf16` |
 | Positions | Checked `byte_to_position` / `position_to_byte` with byte, scalar or UTF-16 columns |
 | Lines | `line_bounds`, shared `line` / `line_content` slices, `lines` / `line_contents` / `lines_from` iterators |
-| Iteration | Lazy fused `chunks`, `bytes`, `scalars`, `chunks_from_byte`, `scalars_from` |
+| Iteration | Lazy fused `chunks`, `bytes`, `scalars`, `chunks_from_byte`, `scalars_from`, `scalars_rev`, `scalars_before` |
 | Streaming and validation | Generic `write_to`, full AVL/summary/UTF-8 `validate`, `ToString`, `Debug`, content-based `PartialEq` / `Eq` |
 
 `replace_bytes(start, end, replacement)` accepts a `Rope`, so a replacement may share existing text. Ranges are half-open. Slicing returns an independent immutable rope with the same API, sharing its interior subtrees. Scalar indexes count Unicode scalar values, not grapheme clusters.
+
+`scalars_rev()` visits all scalars in reverse order. `scalars_before(index)` starts
+immediately before a checked scalar boundary, so zero produces an empty iterator
+and `len_scalars()` visits the whole rope backward. It seeks through cached subtree
+counts in O(log N) plus a bounded leaf scan, then traverses once using O(log N)
+cursor space. It does not split, flatten or rebuild the rope. Both iterators are
+fused and retain their immutable snapshot; copies share cursor state, while new
+constructors create independent cursors. CRLF yields LF then CR in reverse order.
 
 All indexes use nonnegative `isize`. Boundary conversions accept EOF. Accessors `byte` and `scalar` require an actual element. UTF-8 interior bytes and UTF-16 surrogate interiors are rejected instead of rounded. `line_to_byte(len_lines())` is a one-past-line sentinel returning the byte length; `line(index)` accepts only actual lines.
 
@@ -72,7 +80,7 @@ For `N` logical text bytes, with fixed 1024-byte maximum leaf size:
 
 The logical byte limit is `isize::MAX - 1` on the repository's Linux amd64 target, keeping the additional final-line count representable. Concatenation, replacement and builder append detect overflow before changing state, including enormous logical ropes made through shared doubling. Such ropes can be represented cheaply, but flattening, full traversal and validation still require resources proportional to their logical contents. Allocation exhaustion is not converted into `Error`.
 
-This is not a drop-in Ropey port: there are no grapheme iterators, reverse iterators, Unicode newline feature flags, editing-history manager, search engine, or memory-mapped backing. A rope stores valid UTF-8 only. Tree nodes use GoML GC-managed private references rather than ownership or reference-counted copy-on-write. The API has no panic-unwind cleanup promise and does not add cancellation to arbitrary caller-provided blocking streams.
+This is not a drop-in Ropey port: there are no grapheme iterators, Unicode newline feature flags, editing-history manager, search engine, or memory-mapped backing. A rope stores valid UTF-8 only. Tree nodes use GoML GC-managed private references rather than ownership or reference-counted copy-on-write. The API has no panic-unwind cleanup promise and does not add cancellation to arbitrary caller-provided blocking streams.
 
 ## Verification
 
