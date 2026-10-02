@@ -36,3 +36,20 @@ fn downstream_backward_word_scan_preserves_unicode() -> () {
     }
     testing::assert(word == Vec::from_array(['é', '😀']));
 }
+
+#[test]
+fn downstream_reverse_chunks_and_byte_prefixes() -> () {
+    let document = testing::expect_ok(rope::Rope::from_string("é😀"), "rope");
+    let chunks: Vec[string] = Vec::new();
+    for chunk in testing::expect_ok(document.chunks_before_byte(2), "chunks") {
+        chunks.push(chunk);
+    }
+    testing::assert_eq(chunks.join(""), "é");
+    testing::assert_eq(
+        testing::expect_some(
+            testing::expect_ok(document.bytes_before(1), "interior prefix").next(),
+            "byte",
+        ),
+        195,
+    );
+}

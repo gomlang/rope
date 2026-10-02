@@ -1,0 +1,76 @@
+package tests;
+
+use ecosystem::rope;
+use std::testing;
+use std::task;
+
+#[test]
+fn reverse_bytes_accept_every_offset_and_chunks_keep_utf8() -> () {
+    let source = "aé😀\r\n".repeat(140);
+    let document = testing::expect_ok(rope::Rope::from_string(source), "rope");
+    for index in 0..source.byte_len() + 1 {
+        let cursor = testing::expect_ok(document.bytes_before(index), "prefix");
+        let mut at = index;
+        while at > 0 {
+            at -= 1;
+            testing::assert_eq(testing::expect_some(cursor.next(), "byte"), source.byte_get(at));
+        }
+        testing::assert_none(cursor.next());
+        if source.is_char_boundary(index) {
+            let chunks: Vec[string] = Vec::new();
+            let cursor = testing::expect_ok(document.chunks_before_byte(index), "chunks");
+            for chunk in cursor {
+                testing::assert(chunk.byte_len() <= 1024);
+                chunks.push(chunk);
+            }
+            testing::assert_none(cursor.next());
+            chunks.reverse();
+            testing::assert_eq(chunks.join(""), source.byte_slice(0, index));
+        } else {
+            testing::assert_err(document.chunks_before_byte(index));
+        }
+    }
+    testing::assert_err(document.bytes_before(-1));
+    testing::assert_err(document.bytes_before(document.len_bytes() + 1));
+    testing::assert_none(rope::Rope::new().chunks_rev().next());
+}
+
+#[test]
+fn reverse_byte_and_chunk_cursors_preserve_alias_and_snapshot_semantics() -> () {
+    let document = testing::expect_ok(rope::Rope::from_string("ab😀"), "rope");
+    let cursor = document.bytes_rev();
+    let alias = cursor;
+    testing::assert_eq(testing::expect_some(cursor.next(), "last"), 128);
+    testing::assert_eq(testing::expect_some(alias.next(), "shared"), 152);
+    let changed = testing::expect_ok(document.insert(3, "x"), "edit");
+    testing::assert_eq(testing::expect_some(changed.bytes_rev().next(), "new"), b'x');
+    let mut large = document;
+    for _ in 0..30 {
+        large = testing::expect_ok(large.concat(large), "shared");
+    }
+    testing::assert_eq(
+        testing::expect_some(
+            testing::expect_ok(large.bytes_before(large.len_bytes() - 4), "seek").next(),
+            "last ASCII",
+        ),
+        b'b',
+    );
+    task::scope(
+        |scope| {
+            let results: Channel[bool] = Channel::new(4);
+            for _ in 0..4 {
+                scope.spawn(
+                    |_| {
+                        results.send(
+                            document.chunks_rev().next() == Option::Some("ab😀")
+                                && document.bytes_rev().next() == Option::Some(128),
+                        );
+                    },
+                );
+            }
+            for _ in 0..4 {
+                testing::assert(testing::expect_some(results.recv(), "result"));
+            }
+        },
+    );
+}
