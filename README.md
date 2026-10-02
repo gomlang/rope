@@ -2,7 +2,7 @@
 
 A pure GoML persistent UTF-8 rope, inspired by [Ropey](https://docs.rs/ropey/latest/ropey/struct.Rope.html). It implements a chunked AVL tree, not a flat string with editing helpers. There are no Go adapters or native dependencies.
 
-The package owns `ecosystem::rope`; the separate `consumer::rope` module resolves version `0.1.0` through the ecosystem registry fixture. The LSP library uses this rope for document storage and edits.
+The package owns `ecosystem::rope`; `examples/basic/` uses its public API and `goml verify` checks it as an independent downstream module. The LSP library uses this rope for document storage and edits.
 
 ## Representation and snapshots
 
@@ -82,6 +82,18 @@ From the repository root:
 (cd ../verification && just ecosystem-test rope)
 ```
 
-The verifier checks formatting, 11 library black-box tests, separate versioned consumer tests, initial and cached consumer builds, the runnable consumer, native reference corpus checks, and Go's race detector over all library tests.
+The verifier checks formatting, 11 library black-box tests, example tests, downstream checks, initial and cached example builds, the runnable example, native reference corpus checks, and Go's race detector over all library tests.
 
-Native consumer tests retain every result from an independent flat-string / UTF-8 / UTF-16 / newline model: 67 deterministic scenarios, 3266 edits, and every final byte/scalar/UTF-16/line boundary. It covers malformed ranges, split surrogate and UTF-8 positions, CRLF at leaf seams, rotations, concatenation, compaction, builder fragments and snapshot preservation. Black-box tests additionally exercise AVL balance under repeated left/right joins, retained snapshots through edits, fragmented/invalid streaming I/O, parallel readers and editors, and checked logical-size overflow through shared doubling without huge allocations.
+Native example tests retain every result from an independent flat-string / UTF-8 / UTF-16 / newline model: 67 deterministic scenarios, 3266 edits, and every final byte/scalar/UTF-16/line boundary. It covers malformed ranges, split surrogate and UTF-8 positions, CRLF at leaf seams, rotations, concatenation, compaction, builder fragments and snapshot preservation. Black-box tests additionally exercise AVL balance under repeated left/right joins, retained snapshots through edits, fragmented/invalid streaming I/O, parallel readers and editors, and checked logical-size overflow through shared doubling without huge allocations.
+
+## Development and examples
+
+Requires GoML 0.1.55 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+
+```sh
+goml run --example basic
+goml test
+goml verify --timeout 300s
+```
+
+`goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test rope)` also retains the library-specific smoke and compatibility checks.

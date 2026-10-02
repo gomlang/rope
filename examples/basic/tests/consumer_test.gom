@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::rope as application;
+use ecosystem::rope::examples::basic as application;
 use ecosystem::rope;
 use std::io;
 use std::bytes;
