@@ -226,3 +226,114 @@ impl Rope {
         }
     }
 }
+
+pub struct ReverseChunks {
+    pending: Vec[Ref[Node]],
+    prefix: Ref[Option[string]],
+}
+
+impl Iterator for ReverseChunks {
+    type Item = string;
+
+    fn next(self: ReverseChunks) -> Option[string] {
+        if let Some(prefix) = self.prefix.get() {
+            self.prefix.set(Option::None);
+            if prefix != "" {
+                return Option::Some(prefix)
+            }
+        }
+        while let Some(node) = self.pending.pop() {
+            match node.get() {
+                Empty => (),
+                Leaf(value, _) => return Option::Some(value),
+                Branch(left, right, _, _) => {
+                    self.pending.push(left);
+                    self.pending.push(right);
+                },
+            }
+        }
+        Option::None
+    }
+}
+
+pub struct ReverseBytes {
+    chunks: ReverseChunks,
+    current: Ref[string],
+    offset: Ref[isize],
+}
+
+impl Iterator for ReverseBytes {
+    type Item = byte;
+
+    fn next(self: ReverseBytes) -> Option[byte] {
+        while self.offset.get() == 0 {
+            match self.chunks.next() {
+                Some(value) => {
+                    self.current.set(value);
+                    self.offset.set(value.byte_len());
+                },
+                None => return Option::None,
+            }
+        }
+        self.offset.set(self.offset.get() - 1);
+        Option::Some(self.current.get().byte_get(self.offset.get()))
+    }
+}
+
+impl Rope {
+    pub fn chunks_rev(self: Rope) -> ReverseChunks {
+        ReverseChunks { pending: Vec::from_array([self.root]), prefix: Ref::new(Option::None) }
+    }
+
+    pub fn bytes_rev(self: Rope) -> ReverseBytes {
+        ReverseBytes { chunks: self.chunks_rev(), current: Ref::new(""), offset: Ref::new(0) }
+    }
+
+    pub fn bytes_before(self: Rope, index: isize) -> Result[ReverseBytes, Error] {
+        bounded(index, self.len_bytes(), "byte")?;
+        let pending: Vec[Ref[Node]] = Vec::new();
+        let mut node = self.root;
+        let mut remaining = index;
+        loop {
+            match node.get() {
+                Empty => return Result::Ok(
+                    ReverseBytes {
+                        chunks: ReverseChunks { pending, prefix: Ref::new(Option::None) },
+                        current: Ref::new(""),
+                        offset: Ref::new(0),
+                    },
+                ),
+                Leaf(value, _) => return Result::Ok(
+                    ReverseBytes {
+                        chunks: ReverseChunks { pending, prefix: Ref::new(Option::None) },
+                        current: Ref::new(value),
+                        offset: Ref::new(remaining),
+                    },
+                ),
+                Branch(left, right, _, _) => {
+                    let count = summary(left).bytes;
+                    if remaining <= count {
+                        node = left;
+                    } else {
+                        pending.push(left);
+                        remaining -= count;
+                        node = right;
+                    }
+                },
+            }
+        }
+    }
+
+    pub fn chunks_before_byte(self: Rope, index: isize) -> Result[ReverseChunks, Error] {
+        self.checked_byte(index)?;
+        let cursor = self.bytes_before(index)?;
+        Result::Ok(
+            ReverseChunks {
+                pending: cursor.chunks.pending,
+                prefix: Ref::new(
+                    Option::Some(cursor.current.get().byte_slice(0, cursor.offset.get())),
+                ),
+            },
+        )
+    }
+}
