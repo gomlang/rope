@@ -1,0 +1,81 @@
+package tests;
+
+use ecosystem::rope;
+use std::testing;
+use std::task;
+
+#[test]
+fn reverse_scalars_seek_every_boundary_across_chunks() -> () {
+    let source = "aé😀\r\n".repeat(250);
+    let document = testing::expect_ok(rope::Rope::from_string(source), "rope");
+    let expected: Vec[char] = Vec::new();
+    for ch in source.chars() {
+        expected.push(ch);
+    }
+    for boundary in 0..expected.len() + 1 {
+        let cursor = testing::expect_ok(document.scalars_before(boundary), "seek");
+        let mut index = boundary;
+        while index > 0 {
+            index -= 1;
+            testing::assert_eq(testing::expect_some(cursor.next(), "scalar"), expected[index]);
+        }
+        testing::assert_none(cursor.next());
+        testing::assert_none(cursor.next());
+    }
+    testing::assert_err(document.scalars_before(-1));
+    testing::assert_err(document.scalars_before(document.len_scalars() + 1));
+    let reverse = document.scalars_rev();
+    expected.reverse();
+    for ch in expected {
+        testing::assert_eq(testing::expect_some(reverse.next(), "reverse"), ch);
+    }
+    testing::assert_none(reverse.next());
+    testing::assert_none(rope::Rope::new().scalars_rev().next());
+}
+
+#[test]
+fn reverse_cursors_preserve_snapshots_and_seek_shared_large_ropes() -> () {
+    let original = testing::expect_ok(rope::Rope::from_string("ab😀"), "rope");
+    let cursor = original.scalars_rev();
+    let alias = cursor;
+    let independent = original.scalars_rev();
+    let changed = testing::expect_ok(original.insert(3, "z"), "edit");
+    testing::assert_eq(testing::expect_some(cursor.next(), "original"), '😀');
+    testing::assert_eq(testing::expect_some(alias.next(), "shared cursor"), 'b');
+    testing::assert_eq(testing::expect_some(independent.next(), "independent"), '😀');
+    testing::assert_eq(testing::expect_some(changed.scalars_rev().next(), "edited"), 'z');
+    let mut large = original;
+    for _ in 0..30 {
+        large = testing::expect_ok(large.concat(large), "shared doubling");
+    }
+    let suffix = testing::expect_ok(large.scalars_before(large.len_scalars() - 1), "large seek");
+    for expected in['b', 'a', '😀', 'b'] {
+        testing::assert_eq(testing::expect_some(suffix.next(), "large suffix"), expected);
+    }
+}
+
+#[test]
+fn independent_reverse_cursors_share_immutable_snapshots_in_parallel() -> () {
+    let document = testing::expect_ok(rope::Rope::from_string("a😀".repeat(1000)), "rope");
+    task::scope(
+        |scope| {
+            let results: Channel[bool] = Channel::new(4);
+            for _ in 0..4 {
+                scope.spawn(
+                    |_| {
+                        let cursor = document.scalars_rev();
+                        let mut correct = true;
+                        for _ in 0..1000 {
+                            correct = correct && cursor.next() == Option::Some('😀')
+                                && cursor.next() == Option::Some('a');
+                        }
+                        results.send(correct && cursor.next().is_none());
+                    },
+                );
+            }
+            for _ in 0..4 {
+                testing::assert(testing::expect_some(results.recv(), "worker"));
+            }
+        },
+    );
+}

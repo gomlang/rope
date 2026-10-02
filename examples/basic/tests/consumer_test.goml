@@ -22,3 +22,17 @@ fn exported_document_and_generic_stream_api() -> () {
     testing::assert_eq(saved.to_string(), "跨模块😀\r\n");
     testing::assert_eq(edited.to_string(), "模块😀\r\n");
 }
+
+#[test]
+fn downstream_backward_word_scan_preserves_unicode() -> () {
+    let document = testing::expect_ok(rope::Rope::from_string("first 😀é"), "rope");
+    let cursor = testing::expect_ok(document.scalars_before(document.len_scalars()), "cursor");
+    let word: Vec[char] = Vec::new();
+    while let Some(ch) = cursor.next() {
+        if ch == ' ' {
+            break;
+        }
+        word.push(ch);
+    }
+    testing::assert(word == Vec::from_array(['é', '😀']));
+}
