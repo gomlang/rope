@@ -140,6 +140,54 @@ impl Rope {
     }
 }
 
+pub struct ReverseLines {
+    rope: Rope,
+    remaining: Ref[isize],
+    include_ending: bool,
+}
+
+impl Iterator for ReverseLines {
+    type Item = Rope;
+
+    fn next(self: ReverseLines) -> Option[Rope] {
+        let remaining = self.remaining.get();
+        if remaining == 0 {
+            return Option::None
+        }
+        let index = remaining - 1;
+        self.remaining.set(index);
+        let result = if self.include_ending {
+            self.rope.line(index)
+        } else {
+            self.rope.line_content(index)
+        };
+        match result {
+            Ok(value) => Option::Some(value),
+            Err(_) => Option::None,
+        }
+    }
+}
+
+impl Rope {
+    pub fn lines_rev(self: Rope) -> ReverseLines {
+        ReverseLines { rope: self, remaining: Ref::new(self.len_lines()), include_ending: true }
+    }
+
+    pub fn line_contents_rev(self: Rope) -> ReverseLines {
+        ReverseLines { rope: self, remaining: Ref::new(self.len_lines()), include_ending: false }
+    }
+
+    pub fn lines_before(self: Rope, index: isize) -> Result[ReverseLines, Error] {
+        bounded(index, self.len_lines(), "line")?;
+        Result::Ok(ReverseLines { rope: self, remaining: Ref::new(index), include_ending: true })
+    }
+
+    pub fn line_contents_before(self: Rope, index: isize) -> Result[ReverseLines, Error] {
+        bounded(index, self.len_lines(), "line")?;
+        Result::Ok(ReverseLines { rope: self, remaining: Ref::new(index), include_ending: false })
+    }
+}
+
 pub struct ReverseScalars {
     pending: Vec[Ref[Node]],
     current: Ref[string],

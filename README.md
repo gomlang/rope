@@ -37,7 +37,7 @@ fn edit() -> Result[rope::Rope, rope::Error] {
 | Structural operations | Scalar-indexed `slice`, `split_at`; byte-indexed `slice_bytes`, `split_at_byte`; `compact`, `snapshot` |
 | Index conversion | `byte_to_scalar`, `scalar_to_byte`, `byte_to_utf16`, `utf16_to_byte`, `scalar_to_utf16`, `utf16_to_scalar`, `byte_to_line`, `line_to_byte`, `line_to_scalar`, `line_to_utf16` |
 | Positions | Checked `byte_to_position` / `position_to_byte` with byte, scalar or UTF-16 columns |
-| Lines | `line_bounds`, shared `line` / `line_content` slices, `lines` / `line_contents` / `lines_from` iterators |
+| Lines | `line_bounds`, shared `line` / `line_content` slices, `lines` / `line_contents` / `lines_from`, reverse `lines_rev` / `line_contents_rev` / `lines_before` / `line_contents_before` iterators |
 | Iteration | Lazy fused `chunks`, `bytes`, `scalars`, `chunks_from_byte`, `scalars_from`, `scalars_rev`, `scalars_before`, `chunks_rev`, `chunks_before_byte`, `bytes_rev`, `bytes_before` |
 | Streaming and validation | Generic `write_to`, full AVL/summary/UTF-8 `validate`, `ToString`, `Debug`, content-based `PartialEq` / `Eq` |
 
@@ -60,6 +60,14 @@ are fused, preserve snapshots and share cursor state on assignment. Checked pref
 seeks use cached subtree byte counts in O(log N); traversal uses O(log N) space
 without flattening or rebuilding the rope. A partial first chunk is bounded to one
 leaf. Reversing raw bytes does not produce UTF-8 text in general.
+
+`lines_rev()` and `line_contents_rev()` walk lines backward, retaining or removing
+terminators respectively. `lines_before(index)` and `line_contents_before(index)`
+start with line `index - 1`; zero is empty and `len_lines()` selects every line.
+The final empty line after a terminator is included, as is the one empty line in
+an empty rope. Returned ropes share immutable text. Iterators retain a snapshot,
+are fused, and share their cursor on assignment. Indexed line lookup takes
+O(log N) per yielded line without flattening or visiting skipped lines.
 
 All indexes use nonnegative `isize`. Boundary conversions accept EOF. Accessors `byte` and `scalar` require an actual element. UTF-8 interior bytes and UTF-16 surrogate interiors are rejected instead of rounded. `line_to_byte(len_lines())` is a one-past-line sentinel returning the byte length; `line(index)` accepts only actual lines.
 
@@ -90,7 +98,7 @@ For `N` logical text bytes, with fixed 1024-byte maximum leaf size:
 
 The logical byte limit is `isize::MAX - 1` on the repository's Linux amd64 target, keeping the additional final-line count representable. Concatenation, replacement and builder append detect overflow before changing state, including enormous logical ropes made through shared doubling. Such ropes can be represented cheaply, but flattening, full traversal and validation still require resources proportional to their logical contents. Allocation exhaustion is not converted into `Error`.
 
-This is not a drop-in Ropey port: there are no grapheme or reverse line iterators, Unicode newline feature flags, editing-history manager, search engine, or memory-mapped backing. A rope stores valid UTF-8 only. Tree nodes use GoML GC-managed private references rather than ownership or reference-counted copy-on-write. The API has no panic-unwind cleanup promise and does not add cancellation to arbitrary caller-provided blocking streams.
+This is not a drop-in Ropey port: there are no grapheme iterators, Unicode newline feature flags, editing-history manager, search engine, or memory-mapped backing. A rope stores valid UTF-8 only. Tree nodes use GoML GC-managed private references rather than ownership or reference-counted copy-on-write. The API has no panic-unwind cleanup promise and does not add cancellation to arbitrary caller-provided blocking streams.
 
 ## Verification
 

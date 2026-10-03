@@ -53,3 +53,16 @@ fn downstream_reverse_chunks_and_byte_prefixes() -> () {
         195,
     );
 }
+
+#[test]
+fn downstream_reverse_lines_support_editor_navigation() -> () {
+    let document = testing::expect_ok(rope::Rope::from_string("first\r\n😀\nlast"), "rope");
+    let cursor = testing::expect_ok(document.line_contents_before(2), "previous lines");
+    testing::assert_eq(testing::expect_some(cursor.next(), "previous").to_string(), "😀");
+    testing::assert_eq(testing::expect_some(cursor.next(), "first").to_string(), "first");
+    testing::assert_none(cursor.next());
+    testing::assert_eq(
+        testing::expect_some(document.lines_rev().next(), "last").to_string(),
+        "last",
+    );
+}

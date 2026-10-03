@@ -1,0 +1,85 @@
+package tests;
+
+use ecosystem::rope;
+use std::testing;
+
+#[test]
+fn reverse_lines_preserve_terminators_empty_lines_and_unicode() -> () {
+    for (input, lines, contents) in Vec::from_array(
+        [
+            ("", Vec::from_array([""]), Vec::from_array([""])),
+            ("é😀", Vec::from_array(["é😀"]), Vec::from_array(["é😀"])),
+            (
+                "a\r\nb\rc\n",
+                Vec::from_array(["a\r\n", "b\r", "c\n", ""]),
+                Vec::from_array(["a", "b", "c", ""]),
+            ),
+            (
+                "\r\n\n\r",
+                Vec::from_array(["\r\n", "\n", "\r", ""]),
+                Vec::from_array(["", "", "", ""]),
+            ),
+        ],
+    ) {
+        let document = testing::expect_ok(rope::Rope::from_string(input), "rope");
+        for boundary in 0..lines.len() + 1 {
+            let full = testing::expect_ok(document.lines_before(boundary), "line seek");
+            let content = testing::expect_ok(
+                document.line_contents_before(boundary),
+                "content seek",
+            );
+            let mut index = boundary;
+            while index > 0 {
+                index -= 1;
+                testing::assert_eq(
+                    testing::expect_some(full.next(), "line").to_string(),
+                    lines[index],
+                );
+                testing::assert_eq(
+                    testing::expect_some(content.next(), "content").to_string(),
+                    contents[index],
+                );
+            }
+            testing::assert_none(full.next());
+            testing::assert_none(full.next());
+            testing::assert_none(content.next());
+        }
+        testing::assert_err(document.lines_before(-1));
+        testing::assert_err(document.lines_before(document.len_lines() + 1));
+        testing::assert_err(document.line_contents_before(-1));
+        testing::assert_err(document.line_contents_before(document.len_lines() + 1));
+        testing::assert_eq(
+            testing::expect_some(document.lines_rev().next(), "last").to_string(),
+            lines[lines.len() - 1],
+        );
+        testing::assert_eq(
+            testing::expect_some(document.line_contents_rev().next(), "last content").to_string(),
+            contents[contents.len() - 1],
+        );
+    }
+}
+
+#[test]
+fn reverse_lines_retain_snapshots_alias_cursors_and_cross_leaf_crlf() -> () {
+    let prefix = "a".repeat(1023);
+    let document = testing::expect_ok(rope::Rope::from_string(prefix + "\r\né😀\r\ntail"), "rope");
+    let full = document.lines_rev();
+    let alias = full;
+    let independent = document.lines_rev();
+    let changed = testing::expect_ok(document.insert(document.len_scalars(), "!"), "edit");
+    testing::assert_eq(testing::expect_some(full.next(), "tail").to_string(), "tail");
+    testing::assert_eq(testing::expect_some(alias.next(), "shared").to_string(), "é😀\r\n");
+    testing::assert_eq(testing::expect_some(full.next(), "seam").to_string(), prefix + "\r\n");
+    testing::assert_none(full.next());
+    testing::assert_eq(testing::expect_some(independent.next(), "independent").to_string(), "tail");
+    testing::assert_eq(
+        testing::expect_some(changed.line_contents_rev().next(), "changed").to_string(),
+        "tail!",
+    );
+    let mut large = testing::expect_ok(rope::Rope::from_string("x\n"), "seed");
+    for _ in 0..30 {
+        large = testing::expect_ok(large.concat(large), "shared doubling");
+    }
+    let cursor = testing::expect_ok(large.lines_before(large.len_lines() - 1), "large seek");
+    testing::assert_eq(testing::expect_some(cursor.next(), "large line").to_string(), "x\n");
+}
