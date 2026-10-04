@@ -1,0 +1,79 @@
+package rope;
+
+fn expand_comparison(pending: Vec[Ref[Node]], left: Ref[Node], right: Ref[Node]) -> () {
+    pending.pop();
+    pending.push(right);
+    pending.push(left);
+}
+
+fn equal_nodes(left_root: Ref[Node], right_root: Ref[Node]) -> bool {
+    let left = Vec::new();
+    let right = Vec::new();
+    left.push(left_root);
+    right.push(right_root);
+    let mut left_offset = 0;
+    let mut right_offset = 0;
+    while let Some(a) = left.last() {
+        let b = match right.last() {
+            Some(value) => value,
+            None => return false,
+        };
+        // Cursors have consumed the same number of bytes. Matching references
+        // and leaf offsets therefore identify an equal remaining text span.
+        if a == b && left_offset == right_offset {
+            left.pop();
+            right.pop();
+            left_offset = 0;
+            right_offset = 0;
+            continue
+        }
+        match (a.get(), b.get()) {
+            (Empty, Empty) => {
+                left.pop();
+                right.pop();
+            },
+            (Empty, _) => {
+                left.pop();
+            },
+            (_, Empty) => {
+                right.pop();
+            },
+            (Branch(al, ar, av, _), Branch(bl, br, bv, _)) => {
+                // Open the larger span first so differently balanced trees can
+                // expose a shared subtree before descending into its leaves.
+                if av.bytes >= bv.bytes {
+                    expand_comparison(left, al, ar);
+                } else {
+                    expand_comparison(right, bl, br);
+                }
+            },
+            (Branch(al, ar, _, _), _) => expand_comparison(left, al, ar),
+            (_, Branch(bl, br, _, _)) => expand_comparison(right, bl, br),
+            (Leaf(av, _), Leaf(bv, _)) => {
+                let left_remaining = av.byte_len() - left_offset;
+                let right_remaining = bv.byte_len() - right_offset;
+                let count = if left_remaining < right_remaining {
+                    left_remaining
+                } else {
+                    right_remaining
+                };
+                for at in 0..count {
+                    if av.byte_get(left_offset + at) != bv.byte_get(right_offset + at) {
+                        return false
+                    }
+                }
+                left_offset += count;
+                right_offset += count;
+                if left_offset == av.byte_len() {
+                    left.pop();
+                    left_offset = 0;
+                }
+                if right_offset == bv.byte_len() {
+                    right.pop();
+                    right_offset = 0;
+                }
+            },
+        }
+    }
+    right.is_empty()
+}

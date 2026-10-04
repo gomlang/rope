@@ -1,0 +1,67 @@
+package tests;
+
+use ecosystem::rope;
+use std::testing;
+
+#[test]
+fn equality_skips_shared_subtrees_without_expanding_logical_text() -> () {
+    let mut shared = testing::expect_ok(rope::Rope::from_string("a界😀\r\n"), "seed");
+    for _ in 0..36 {
+        shared = testing::expect_ok(shared.concat(shared), "shared doubling");
+    }
+    let left = testing::expect_ok(shared.concat(shared), "left root");
+    let right = testing::expect_ok(shared.concat(shared), "right root");
+    testing::assert(left == right);
+    let prefix = testing::expect_ok(rope::Rope::from_string("left"), "prefix");
+    let suffix = testing::expect_ok(rope::Rope::from_string("right"), "suffix");
+    let different = testing::expect_ok(rope::Rope::from_string("righx"), "different suffix");
+    let first = testing::expect_ok(
+        testing::expect_ok(prefix.concat(shared), "left association").concat(suffix),
+        "first tree",
+    );
+    let second = testing::expect_ok(
+        prefix.concat(testing::expect_ok(shared.concat(suffix), "right association")),
+        "second tree",
+    );
+    testing::assert(first == second);
+    testing::assert(second == first);
+    let changed = testing::expect_ok(
+        prefix.concat(testing::expect_ok(shared.concat(different), "changed suffix")),
+        "changed tree",
+    );
+    testing::assert(first != changed);
+    testing::assert(changed != first);
+}
+
+#[test]
+fn equality_ignores_chunk_boundaries_and_checks_every_unshared_byte() -> () {
+    let source = "ab界😀\r\nz".repeat(400);
+    let original = testing::expect_ok(rope::Rope::from_string(source), "original");
+    for split in[1, 31, 509, 1023, 1024, 2047, 3071] {
+        let mut at = split;
+        while !source.is_char_boundary(at) {
+            at += 1;
+        }
+        let first = testing::expect_ok(rope::Rope::from_string(source.byte_slice(0, at)), "prefix");
+        let second = testing::expect_ok(
+            rope::Rope::from_string(source.byte_slice(at, source.byte_len())),
+            "suffix",
+        );
+        let rejoined = testing::expect_ok(first.concat(second), "different chunks");
+        testing::assert(original == rejoined);
+        testing::assert(rejoined == original);
+        let changed = testing::expect_ok(
+            rejoined.replace_bytes(
+                rejoined.len_bytes() - 1,
+                rejoined.len_bytes(),
+                testing::expect_ok(rope::Rope::from_string("y"), "replacement"),
+            ),
+            "changed final byte",
+        );
+        testing::assert(original != changed);
+        testing::assert(changed != original);
+    }
+    testing::assert(rope::Rope::new() == testing::expect_ok(rope::Rope::from_string(""), "empty"));
+    testing::assert(original != rope::Rope::new());
+    testing::assert_eq(original.to_string(), source);
+}

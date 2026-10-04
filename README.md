@@ -89,7 +89,8 @@ LF, CRLF and lone CR terminate lines. CRLF remains one terminator even when its 
 
 For `N` logical text bytes, with fixed 1024-byte maximum leaf size:
 
-- Construction, full traversal, flattening, equality and compaction take `O(N)` time.
+- Construction, full traversal, flattening and compaction take `O(N)` time.
+- Equality takes `O(N)` time in the worst case and `O(log N)` cursor space. It skips identical shared subtrees without visiting their logical contents and compares unshared bytes directly, including when the two ropes have different chunk boundaries or tree shapes.
 - Lengths and snapshot creation take `O(1)` time.
 - Point queries, conversions, splitting and shared slicing take `O(log N)` time plus a bounded leaf scan/copy. Concatenation takes `O(|left height - right height| + 1)` plus bounded leaf work; insertion of `M` fresh bytes takes `O(M + log N)`.
 - Chunk, byte and scalar iterators use `O(log N)` cursor space and visit text once. Line iterators produce shared slices using indexed line lookup, so traversal costs `O(number of lines × log N)` plus any requested text materialization.

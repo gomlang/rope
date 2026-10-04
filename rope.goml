@@ -389,15 +389,7 @@ impl PartialEq for Rope {
         if summary(self.root) != summary(other.root) {
             return false
         }
-        let left = self.bytes();
-        let right = other.bytes();
-        loop {
-            match (left.next(), right.next()) {
-                (None, None) => return true,
-                (Some(a), Some(b)) if a == b => (),
-                _ => return false,
-            }
-        }
+        equal_nodes(self.root, other.root)
     }
 }
 
