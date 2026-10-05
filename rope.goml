@@ -139,10 +139,7 @@ impl Rope {
 
     pub fn scalar(self: Rope, index: isize) -> Result[char, Error] {
         bounded(index, self.len_scalars() - 1, "scalar")?;
-        let at = self.scalar_to_byte(index)?;
-        let end = self.scalar_to_byte(index + 1)?;
-        let value = self.slice_bytes(at, end)?.to_string();
-        Result::Ok(value.get(0))
+        node_scalar(self.root, index)
     }
 
     fn checked_byte(self: Rope, index: isize) -> Result[(), Error] {

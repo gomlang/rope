@@ -233,6 +233,32 @@ fn node_byte(node: Ref[Node], at: isize) -> byte {
     }
 }
 
+fn node_scalar(node: Ref[Node], index: isize) -> Result[char, Error] {
+    match node.get() {
+        Empty => Result::Err(Error::Invariant("scalar access reached an empty node")),
+        Leaf(value, _) => {
+            let mut remaining = index;
+            let mut offset = 0;
+            while let Some((ch, width)) = value.decode_at(offset) {
+                if remaining == 0 {
+                    return Result::Ok(ch)
+                }
+                remaining -= 1;
+                offset += width;
+            }
+            Result::Err(Error::Invariant("scalar access exceeded a leaf"))
+        },
+        Branch(left, right, _, _) => {
+            let length = summary(left).scalars;
+            if index < length {
+                node_scalar(left, index)
+            } else {
+                node_scalar(right, index - length)
+            }
+        },
+    }
+}
+
 fn prefix(node: Ref[Node], end: isize) -> Summary {
     if end == summary(node).bytes {
         return summary(node)

@@ -33,6 +33,7 @@ fn assert_model(value: rope::Rope, expected: string) -> () {
         }
     }
     for (at, ch) in expected.char_indices() {
+        testing::assert_eq(testing::expect_ok(value.scalar(scalar), "scalar access"), ch);
         testing::assert_eq(testing::expect_ok(value.byte_to_scalar(at), "byte to scalar"), scalar);
         testing::assert_eq(testing::expect_ok(value.scalar_to_byte(scalar), "scalar to byte"), at);
         testing::assert_eq(testing::expect_ok(value.byte_to_utf16(at), "byte to UTF-16"), units);
@@ -291,6 +292,11 @@ fn shared_doubling_checks_representable_metadata() -> () {
     let limit = testing::expect_ok(almost.concat(almost), "maximum representable rope");
     testing::assert_eq(limit.len_bytes(), 9223372036854775806);
     testing::assert_eq(limit.len_lines(), 9223372036854775807);
+    testing::assert_eq(testing::expect_ok(limit.scalar(0), "huge first scalar"), '\n');
+    testing::assert_eq(
+        testing::expect_ok(limit.scalar(limit.len_scalars() - 1), "huge final scalar"),
+        '\n',
+    );
     testing::assert_eq(
         testing::expect_ok(limit.line_to_byte(limit.len_lines() - 1), "huge final line"),
         limit.len_bytes(),
