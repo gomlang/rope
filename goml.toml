@@ -2,4 +2,4 @@
 path = "ecosystem::rope"
 
 [dev-dependencies]
-"ecosystem::verification" = true
+"ecosystem::testkit" = true

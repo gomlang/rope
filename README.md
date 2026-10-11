@@ -106,7 +106,7 @@ This is not a drop-in Ropey port: there are no grapheme iterators, Unicode newli
 From the repository root:
 
 ```sh
-(cd ../verification && just ecosystem-test rope)
+(cd ../workflows && just ecosystem-test rope)
 ```
 
 The verifier checks formatting, 11 library black-box tests, example tests, downstream checks, initial and cached example builds, the runnable example, native reference corpus checks, and Go's race detector over all library tests.
@@ -115,11 +115,11 @@ Native example tests retain every result from an independent flat-string / UTF-8
 
 ## Development and examples
 
-Requires the source-built GoML toolchain with unversioned registry support pinned in [verification/ci/toolchain.json](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires the source-built GoML toolchain with unversioned registry support pinned in [workflows/ci/toolchain.json](https://github.com/gomlang/workflows/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
 ```
 
-`goml test` builds the example and runs its tests. `(cd ../verification && just ecosystem-test rope)` also retains the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. `(cd ../workflows && just ecosystem-test rope)` also retains the library-specific smoke and compatibility checks.
