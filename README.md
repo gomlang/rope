@@ -2,7 +2,7 @@
 
 A pure GoML persistent UTF-8 rope, inspired by [Ropey](https://docs.rs/ropey/latest/ropey/struct.Rope.html). It implements a chunked AVL tree, not a flat string with editing helpers. There are no Go adapters or native dependencies.
 
-The package owns `ecosystem::rope`; `examples/basic/` uses its public API and `goml verify` checks it as an independent downstream module. The LSP library uses this rope for document storage and edits.
+The package owns `ecosystem::rope`; `examples/basic/` uses its public API and the ecosystem verification runner checks it as an independent downstream module. The LSP library uses this rope for document storage and edits.
 
 ## Representation and snapshots
 
@@ -115,12 +115,11 @@ Native example tests retain every result from an independent flat-string / UTF-8
 
 ## Development and examples
 
-Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires the source-built GoML toolchain with unversioned registry support pinned in [verification/ci/toolchain.json](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-goml verify --timeout 300s
 ```
 
-`goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test rope)` also retains the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. `(cd ../verification && just ecosystem-test rope)` also retains the library-specific smoke and compatibility checks.
